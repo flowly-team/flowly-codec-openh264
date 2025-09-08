@@ -100,15 +100,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
 
 [[package]]
-name = "bytestring"
-version = "1.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e465647ae23b2823b0753f50decb2d5a86d2bb2cac04788fafd1f80e45378e5f"
-dependencies = [
- "bytes",
-]
-
-[[package]]
 name = "cc"
 version = "1.2.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -156,13 +147,29 @@ dependencies = [
 
 [[package]]
 name = "flowly"
-version = "0.4.2"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3714ac0d2b8f5448e240af75163f96d25ad1208cee861a5043b18b2d31eb798"
 dependencies = [
  "bytes",
- "flowly-core",
- "flowly-io",
- "flowly-service",
- "flowly-spsc",
+ "flowly-core 0.2.8",
+ "flowly-io 0.2.4",
+ "flowly-service 0.2.7",
+ "flowly-spsc 0.2.5",
+ "futures",
+]
+
+[[package]]
+name = "flowly"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "153723f098db48708e6e8e4812fb2378f7bd64d87be0ab41900fd629e64c16ad"
+dependencies = [
+ "bytes",
+ "flowly-core 0.4.0",
+ "flowly-io 0.4.0",
+ "flowly-service 0.4.1",
+ "flowly-spsc 0.4.0",
  "futures",
 ]
 
@@ -172,7 +179,7 @@ version = "0.1.0"
 dependencies = [
  "async-stream",
  "bytes",
- "flowly",
+ "flowly 0.4.1",
  "flowly-flv",
  "futures",
  "log",
@@ -183,7 +190,21 @@ dependencies = [
 
 [[package]]
 name = "flowly-core"
-version = "0.4.2"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "359b5e5bf33488bf9986a1b0712391f7de38ee97c677916ab70522c87c790585"
+dependencies = [
+ "bitflags",
+ "bytes",
+ "futures",
+ "thiserror",
+]
+
+[[package]]
+name = "flowly-core"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f46b96759855b0f00a26cfd0be0d263a16cfc8e320ba6e93927e0d18c0c93e4"
 dependencies = [
  "arrayvec",
  "bitflags",
@@ -198,11 +219,9 @@ version = "0.1.1"
 dependencies = [
  "async-stream",
  "bytes",
- "bytestring",
- "flowly",
+ "flowly 0.2.8",
  "futures",
  "log",
- "serde",
  "smallvec",
  "thiserror",
  "tokio",
@@ -211,12 +230,30 @@ dependencies = [
 
 [[package]]
 name = "flowly-io"
-version = "0.4.2"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f85bdf7745c9a00a4c8f7639eb28c19c96a71661262d6583c38c8954d73c783"
 dependencies = [
  "async-stream",
  "bytes",
- "flowly-core",
- "flowly-service",
+ "flowly-core 0.2.8",
+ "flowly-service 0.2.7",
+ "futures",
+ "glob",
+ "thiserror",
+ "tokio",
+]
+
+[[package]]
+name = "flowly-io"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15dace61fd5149926c10639ca0d1fd363f71583246aceaf009e31e2f8caf437c"
+dependencies = [
+ "async-stream",
+ "bytes",
+ "flowly-core 0.4.0",
+ "flowly-service 0.4.1",
  "futures",
  "glob",
  "thiserror",
@@ -225,11 +262,29 @@ dependencies = [
 
 [[package]]
 name = "flowly-service"
-version = "0.4.2"
+version = "0.2.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10565f06cce02631d45cc9dad68d4d57afc85142f9a2986cdfd26a33c9e8eb73"
 dependencies = [
  "async-stream",
- "flowly-core",
- "flowly-spsc",
+ "flowly-core 0.2.8",
+ "flowly-spsc 0.2.5",
+ "futures",
+ "log",
+ "pin-project-lite",
+ "stream-cancel",
+ "tokio",
+]
+
+[[package]]
+name = "flowly-service"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b36d1c7232ab138d25f5b927f3c39b6b5ee997754f309edd45ccd9348d47f2b"
+dependencies = [
+ "async-stream",
+ "flowly-core 0.4.0",
+ "flowly-spsc 0.4.0",
  "futures",
  "log",
  "pin-project-lite",
@@ -239,7 +294,20 @@ dependencies = [
 
 [[package]]
 name = "flowly-spsc"
-version = "0.4.2"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "72828db0371113be2a6479fc5e52215f01b54877f44c20d0b3b9d8f289ffb887"
+dependencies = [
+ "atomic-waker",
+ "futures",
+ "parking_lot",
+]
+
+[[package]]
+name = "flowly-spsc"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "66b24d8a2ec9f07d2e6292e14986b2e68a2683b03217caf71c684a0b62f86984"
 dependencies = [
  "atomic-waker",
  "futures",
@@ -603,26 +671,6 @@ name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
-
-[[package]]
-name = "serde"
-version = "1.0.219"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f0e2c6ed6606019b4e29e69dbaba95b11854410e5347d525002456dbbb786b6"
-dependencies = [
- "serde_derive",
-]
-
-[[package]]
-name = "serde_derive"
-version = "1.0.219"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b0276cf7f2c73365f7157c8123c21cd9a50fbbd844757af28ca1f5925fc2a00"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
 
 [[package]]
 name = "sha2"
