@@ -2,6 +2,13 @@
 name = "flowly-codec-openh264"
 version = "0.1.0"
 edition = "2024"
+description = "Flowly OpenH264 bindings"
+documentation = "https://docs.rs/flowly-codec-openh264"
+readme = "README.md"
+homepage = "https://github.com/flowly-team/flowly-codec-openh264"
+repository = "https://github.com/flowly-team/flowly-codec-openh264"
+keywords = ["flowly", "h264", "video", "codec"]
+license = "MIT"
 
 [dependencies]
 async-stream = "0.3.6"
@@ -10,7 +17,7 @@ flowly = "0.4.1"
 
 futures = "0.3.31"
 log = "0.4.27"
-openh264 = { version = "0.8.1", features = ["libloading"]}
+openh264 = "0.8.1"
 thiserror = "2.0.12"
 tokio = "1.47.0"
 

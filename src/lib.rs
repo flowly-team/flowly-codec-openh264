@@ -66,13 +66,13 @@ impl<S: FrameSource> VideoFrame for DecodedFrame<S> {
     }
 }
 
-pub struct Openh264Decoder<I: EncodedFrame> {
-    sender: spsc::Sender<I>,
-    receiver: spsc::Receiver<Result<DecodedFrame<I::Source>, Error>>,
+pub struct Openh264Decoder<S> {
+    sender: spsc::Sender<(Bytes, u64, S)>,
+    receiver: spsc::Receiver<Result<DecodedFrame<S>, Error>>,
     _handler: tokio::task::JoinHandle<Result<(), Error>>,
 }
 
-impl<I: EncodedFrame + 'static> Openh264Decoder<I> {
+impl<S: Send + Default + 'static> Openh264Decoder<S> {
     pub fn new(_num_threads: u32) -> Self {
         let (sender, mut rx) = spsc::channel(2);
         let (mut tx, receiver) = spsc::channel(2);
@@ -81,156 +81,144 @@ impl<I: EncodedFrame + 'static> Openh264Decoder<I> {
             sender,
             receiver,
             _handler: tokio::task::spawn_blocking(move || {
-                let mut ts_heap: BinaryHeap<Entry<I>> = BinaryHeap::new();
+                let mut ts_heap: BinaryHeap<Entry<S>> = BinaryHeap::new();
                 let decode_config = DecoderConfig::new().flush_after_decode(Flush::NoFlush);
 
                 let mut decoder = openh264::decoder::Decoder::with_api_config(
-                    unsafe {
-                        openh264::OpenH264API::from_blob_path_unchecked("/usr/lib/libopenh264.so")
-                            .unwrap()
-                    },
+                    openh264::OpenH264API::from_source(),
                     decode_config,
                 )?;
 
                 while let Some(frame) = block_on(rx.recv()) {
-                    // if frame.has_params() {
-                    //     for ps in frame.params() {
-                    //         let res = decoder
-                    //             .decode(ps.as_ref())
-                    //             .map_err(Error::<flowly::Void>::from)
-                    //             .map(|frame| {
-                    //                 frame.map(|frame| Self::make_frame(ts_heap.pop(), frame))
-                    //             });
-
-                    //         if let Some(res) = res.transpose() {
-                    //             if block_on(tx.send(res)).is_err() {
-                    //                 break;
-                    //             }
-                    //         }
-                    //     }
-                    // }
-
                     if let Some(ts) = ts_heap.peek() {
-                        if ts.timestamp() != frame.timestamp() {
-                            ts_heap.push(Entry(frame.clone()));
+                        if ts.0 != frame.1 {
+                            ts_heap.push(Entry(frame.1, frame.2));
                         }
                     } else {
-                        ts_heap.push(Entry(frame.clone()));
+                        ts_heap.push(Entry(frame.1, frame.2));
                     }
 
-                    for chunk in frame.chunks() {
-                        let res = decoder
-                            .decode(chunk.map_to_cpu())
-                            .map_err(Error::from)
-                            .map(|frame| frame.map(|frame| Self::make_frame(ts_heap.pop(), frame)));
+                    let res = decoder
+                        .decode(&frame.0)
+                        .map_err(Error::from)
+                        .map(|frame| frame.map(|frame| Self::make_frame(ts_heap.pop(), frame)));
 
-                        if let Some(res) = res.transpose() {
-                            if block_on(tx.send(res)).is_err() {
-                                break;
-                            }
+                    if let Some(res) = res.transpose() {
+                        if block_on(tx.send(res)).is_err() {
+                            break;
                         }
                     }
                 }
 
-                // match decoder.flush_remaining() {
-                //     Ok(remaining) => {
-                //         for frame in remaining {
-                //             if block_on(tx.send(Ok(Self::make_frame(ts_heap.pop(), frame))))
-                //                 .is_err()
-                //             {
-                //                 break;
-                //             }
-                //         }
-                //     }
-                //     Err(err) => log::error!("openh264::Decoder::flush_remaining error: {err}"),
-                // }
+                match decoder.flush_remaining() {
+                    Ok(remaining) => {
+                        for frame in remaining {
+                            if block_on(tx.send(Ok(Self::make_frame(ts_heap.pop(), frame))))
+                                .is_err()
+                            {
+                                break;
+                            }
+                        }
+                    }
+                    Err(err) => log::error!("openh264::Decoder::flush_remaining error: {err}"),
+                }
 
                 Ok(())
             }),
         }
     }
 
+    #[inline]
+    pub async fn push_data(&mut self, data: Bytes, timestamp: u64, source: S) -> Result<(), Error> {
+        self.sender
+            .send((data, timestamp, source))
+            .await
+            .map_err(|_| Error::TrySendError)
+    }
+
+    #[inline]
+    pub fn pull_frame(&mut self) -> Result<Option<DecodedFrame<S>>, Error> {
+        self.receiver
+            .try_recv()
+            .map_err(|_| Error::TrySendError)?
+            .transpose()
+    }
+
     #[allow(clippy::uninit_vec)]
     fn make_frame(
-        in_frame: Option<Entry<I>>,
+        in_frame: Option<Entry<S>>,
         frame: openh264::decoder::DecodedYUV<'_>,
-    ) -> DecodedFrame<I::Source> {
+    ) -> DecodedFrame<S> {
         let dims = frame.dimensions();
         let mut data = Vec::with_capacity(dims.0 * dims.1 * 3);
         unsafe { data.set_len(dims.0 * dims.1 * 3) };
 
         frame.write_rgb8(&mut data);
 
-        let mut flags = in_frame
-            .as_ref()
-            .map(|x| x.flags())
-            .unwrap_or(FrameFlags::VIDEO_STREAM);
-
-        flags.set(FrameFlags::ENCODED, false);
-        flags.set(FrameFlags::ANNEXB, false);
-
         DecodedFrame {
-            timestamp: in_frame.as_ref().map(|x| x.timestamp()).unwrap_or_default(),
+            timestamp: in_frame.as_ref().map(|x| x.0).unwrap_or_default(),
             data: data.into(),
             width: dims.0 as _,
             height: dims.1 as _,
-            source: in_frame
-                .as_ref()
-                .map(|x| x.source().clone())
-                .unwrap_or_default(),
-            flags,
+            source: in_frame.map(|x| x.1).unwrap_or_default(),
+            flags: FrameFlags::VIDEO_STREAM,
         }
     }
 }
 
-impl<I: EncodedFrame + 'static> Default for Openh264Decoder<I> {
+impl<S: Send + Default + 'static> Default for Openh264Decoder<S> {
     fn default() -> Self {
         Self::new(0)
     }
 }
-impl<F: EncodedFrame + 'static> Service<F> for Openh264Decoder<F> {
+
+impl<F: EncodedFrame + 'static> Service<F> for Openh264Decoder<F::Source> {
     type Out = Result<DecodedFrame<F::Source>, Error>;
 
     fn handle(&mut self, frame: F, _cx: &flowly::Context) -> impl Stream<Item = Self::Out> {
         async_stream::stream! {
-            let _ = self
-                .sender
-                .send(frame)
-                .await;
+            let ts = frame.timestamp();
+            let source = frame.source().clone();
 
-            while let Ok(Some(res)) = self.receiver.try_recv() {
+            for chunk in frame.into_chunks() {
+                if let Err(err) = self.push_data(chunk.into_cpu_bytes(), ts, source.clone()).await {
+                    yield Err(err);
+                }
+            }
+
+            while let Some(res) = self.pull_frame().transpose() {
                 yield res;
             }
         }
     }
 }
 
-struct Entry<F: Frame>(F);
+struct Entry<S>(u64, S);
 
-impl<F: Frame> std::ops::Deref for Entry<F> {
-    type Target = F;
+impl<S> std::ops::Deref for Entry<S> {
+    type Target = S;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.1
     }
 }
 
-impl<F: Frame> PartialEq for Entry<F> {
+impl<S> PartialEq for Entry<S> {
     fn eq(&self, other: &Self) -> bool {
-        self.0.timestamp() == other.0.timestamp()
+        self.0 == other.0
     }
 }
 
-impl<F: Frame> Eq for Entry<F> {}
+impl<S> Eq for Entry<S> {}
 
-impl<F: Frame> PartialOrd for Entry<F> {
+impl<S> PartialOrd for Entry<S> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(other.0.timestamp().cmp(&self.0.timestamp()))
+        Some(Self::cmp(self, other))
     }
 }
 
-impl<F: Frame> Ord for Entry<F> {
+impl<S> Ord for Entry<S> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        other.0.timestamp().cmp(&self.0.timestamp())
+        other.0.cmp(&self.0)
     }
 }
