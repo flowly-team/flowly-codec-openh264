@@ -144,6 +144,11 @@ impl<S: Send + Default + 'static> Openh264Decoder<S> {
             .transpose()
     }
 
+    #[inline]
+    pub fn close(&mut self) {
+        self.sender.close();
+    }
+
     #[allow(clippy::uninit_vec)]
     fn make_frame(
         in_frame: Option<Entry<S>>,

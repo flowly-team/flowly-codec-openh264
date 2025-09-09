@@ -1,6 +1,6 @@
 [package]
 name = "flowly-codec-openh264"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "Flowly OpenH264 bindings"
 documentation = "https://docs.rs/flowly-codec-openh264"
