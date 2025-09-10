@@ -18,7 +18,7 @@ mod error;
 #[derive(Debug, Clone)]
 pub struct DecodedFrame<S> {
     pub timestamp: u64,
-    pub data: Bytes,
+    pub data: Vec<u8>,
     pub width: u16,
     pub height: u16,
     pub flags: FrameFlags,
@@ -27,14 +27,14 @@ pub struct DecodedFrame<S> {
 
 impl<S: FrameSource> DataFrame for DecodedFrame<S> {
     type Source = S;
-    type Chunk = Bytes;
+    type Chunk = Vec<u8>;
 
     fn source(&self) -> &Self::Source {
         &self.source
     }
 
     fn chunks(&self) -> impl Send + Iterator<Item = <Self::Chunk as MemBlock>::Ref<'_>> {
-        std::iter::once(&self.data)
+        std::iter::once(self.data.as_slice())
     }
 
     fn into_chunks(self) -> impl Send + Iterator<Item = Self::Chunk> {
@@ -74,8 +74,8 @@ pub struct Openh264Decoder<S> {
 
 impl<S: Send + Default + 'static> Openh264Decoder<S> {
     pub fn new(_num_threads: u32) -> Self {
-        let (sender, mut rx) = spsc::channel(2);
-        let (mut tx, receiver) = spsc::channel(2);
+        let (sender, mut rx) = spsc::channel(8);
+        let (mut tx, receiver) = spsc::channel(8);
 
         Self {
             sender,
@@ -162,7 +162,7 @@ impl<S: Send + Default + 'static> Openh264Decoder<S> {
 
         DecodedFrame {
             timestamp: in_frame.as_ref().map(|x| x.0).unwrap_or_default(),
-            data: data.into(),
+            data,
             width: dims.0 as _,
             height: dims.1 as _,
             source: in_frame.map(|x| x.1).unwrap_or_default(),
